@@ -13,7 +13,7 @@ from ruptures.exceptions import BadSegmentationParameters
 class BottomUp(BaseEstimator):
     """Bottom-up segmentation."""
 
-    def __init__(self, model="l2", custom_cost=None, min_size=2, jump=5, params=None):
+    def __init__(self, model="l2", custom_cost=None, min_size=2, jump=5, params=None, psi=None):
         """Initialize a BottomUp instance.
 
         Args:
@@ -35,6 +35,7 @@ class BottomUp(BaseEstimator):
         self.n_samples = None
         self.signal = None
         self.leaves = None
+        self.psi = psi
 
     def _grow_tree(self):
         """Grow the entire binary tree."""
@@ -49,6 +50,7 @@ class BottomUp(BaseEstimator):
                 if bkp % self.jump == 0:
                     if bkp - start >= self.min_size and end - bkp >= self.min_size:
                         bkps.append(bkp)
+            bkps = sorted(list(set(bkps + psi))) # add psi to bkps without duplicates ### NEED TO CHECK WHETHER BKPS ARE INC OR EXC
             if len(bkps) > 0:  # at least one admissible breakpoint was found
                 bkp = min(bkps, key=lambda x: abs(x - mid))
                 heapq.heappop(partition)
@@ -57,7 +59,7 @@ class BottomUp(BaseEstimator):
                 stop = False
 
         partition.sort(key=lambda x: x[1])
-        # compute segment costs
+        # compute segment costs ### this should be fine with psi no changes necessary
         leaves = list()
         for _, (start, end) in partition:
             val = self.cost.error(start, end)
@@ -92,8 +94,9 @@ class BottomUp(BaseEstimator):
         removed = set()
         merged = []
         for left, right in pairwise(leaves):
-            candidate = self.merge(left, right)
-            heapq.heappush(merged, (candidate.gain, candidate))
+            if (left not in psi) or (right not in psi): # don't allow psi to be considered for merging
+                candidate = self.merge(left, right)
+                heapq.heappush(merged, (candidate.gain, candidate))
         # bottom up fusion
         stop = False
         while not stop:
