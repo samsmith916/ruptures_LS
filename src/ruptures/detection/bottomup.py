@@ -50,7 +50,6 @@ class BottomUp(BaseEstimator):
                 if bkp % self.jump == 0:
                     if bkp - start >= self.min_size and end - bkp >= self.min_size:
                         bkps.append(bkp)
-            bkps = sorted(list(set(bkps + psi))) # add psi to bkps without duplicates ### NEED TO CHECK WHETHER BKPS ARE INC OR EXC
             if len(bkps) > 0:  # at least one admissible breakpoint was found
                 bkp = min(bkps, key=lambda x: abs(x - mid))
                 heapq.heappop(partition)
@@ -59,12 +58,27 @@ class BottomUp(BaseEstimator):
                 stop = False
 
         partition.sort(key=lambda x: x[1])
-        # compute segment costs ### this should be fine with psi no changes necessary
+        # compute segment costs 
         leaves = list()
+        # for _, (start, end) in partition:
+        #     val = self.cost.error(start, end)
+        #     leaf = Bnode(start, end, val)
+        #     leaves.append(leaf)
         for _, (start, end) in partition:
-            val = self.cost.error(start, end)
-            leaf = Bnode(start, end, val)
-            leaves.append(leaf)
+            if any(person_start_index in range(start, end)):
+        
+                val = self.cost.error(start, self.psi)
+                leaf = Bnode(start, self.psi, val)
+                leaves.append(leaf)
+        
+                val = self.cost.error(self.psi, end)
+                leaf = Bnode(self.psi, end, val)
+                leaves.append(leaf)
+            else:
+                val = self.cost.error(start, end)
+                leaf = Bnode(start, end, val)
+                leaves.append(leaf)
+        
         return leaves
 
     @lru_cache(maxsize=None)
@@ -94,9 +108,8 @@ class BottomUp(BaseEstimator):
         removed = set()
         merged = []
         for left, right in pairwise(leaves):
-            if (left not in psi) or (right not in psi): # don't allow psi to be considered for merging
-                candidate = self.merge(left, right)
-                heapq.heappush(merged, (candidate.gain, candidate))
+            candidate = self.merge(left, right)
+            heapq.heappush(merged, (candidate.gain, candidate))
         # bottom up fusion
         stop = False
         while not stop:
